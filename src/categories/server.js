@@ -1,0 +1,10 @@
+const { getPool } = require('../shared/db');
+const { app, ok, fail, requireAdmin, errors } = require('../shared/http');
+const config = require('../shared/config');
+const server = app();
+server.use(requireAdmin);
+server.get('/categories', async (req,res,next)=>{ try { const [rows]=await getPool().execute('SELECT * FROM categories ORDER BY name'); return ok(res,rows); } catch(e){next(e);} });
+server.post('/categories', async (req,res,next)=>{ try { const {name,description=null}=req.body||{}; if(typeof name!=='string'||!name.trim()) return fail(res,400,'Nama kategori wajib diisi','INVALID_INPUT'); const [r]=await getPool().execute('INSERT INTO categories(name,description) VALUES(?,?)',[name.trim(),description]); return ok(res,{id:r.insertId,name:name.trim()},'Kategori berhasil ditambahkan',201); } catch(e){next(e);} });
+server.put('/categories/:id', async (req,res,next)=>{ try { const {name,description=null}=req.body||{}; if(typeof name!=='string'||!name.trim()) return fail(res,400,'Nama kategori wajib diisi','INVALID_INPUT'); const [r]=await getPool().execute('UPDATE categories SET name=?,description=? WHERE id=?',[name.trim(),description,req.params.id]); return r.affectedRows?ok(res,{id:Number(req.params.id)},'Kategori berhasil diperbarui'):fail(res,404,'Kategori tidak ditemukan','NOT_FOUND'); } catch(e){next(e);} });
+server.delete('/categories/:id', async (req,res,next)=>{ try { const [items]=await getPool().execute('SELECT id FROM items WHERE category_id=? LIMIT 1',[req.params.id]); if(items.length)return fail(res,409,'Kategori masih digunakan barang','CATEGORY_IN_USE'); const [r]=await getPool().execute('DELETE FROM categories WHERE id=?',[req.params.id]); return r.affectedRows?ok(res,null,'Kategori berhasil dihapus'):fail(res,404,'Kategori tidak ditemukan','NOT_FOUND'); } catch(e){next(e);} });
+errors(server); server.listen(config.port('CATEGORIES_PORT',3003),()=>console.log('Categories service ready'));
